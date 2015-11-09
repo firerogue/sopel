@@ -78,40 +78,26 @@ def mw_snippet(server, query):
     server.
     """
     request = urlparse(query)
+    index = 0  # defaults to begining of article in cases of missing/bad anchor
+
     # check for fragment
     if request.fragment is not '':
         # check for section with given name
         tos_url = ('https://' + server + '/w/api.php?format=json&action=parse'
                    '&prop=sections&page=' + request.path)
         tos = json.loads(web.get(tos_url))
-        # list. There's got to be a better way to do this
-        index = None
+        # sections is a list. There's got to be a better way to do this
         for section in tos['parse']['sections']:
             if section['anchor'] == request.fragment:
                 index = section['index']
                 break
-        if index:
-            snippet_url = ('https://' + server + '/w/api.php?format=xml'
-                           '&action=parse&prop=text&page=' + request.path +
-                           '&section=' + index)
-            snippet = web.get(snippet_url)
-            pass  # magic to process HTML into legible snippet_raw
-
-            return snippet
-
-    # Fall back on old behaviour
     snippet_url = ('https://' + server + '/w/api.php?format=json'
-                   '&action=query&prop=extracts&exintro&explaintext'
-                   '&exchars=300&redirects&titles=')
-    snippet_url += query
-    snippet = json.loads(web.get(snippet_url))
-    snippet = snippet['query']['pages']
+                   '&action=parse&prop=text&page=' + request.path +
+                   '&section=' + index)
+    snippet = web.get(snippet_url)
+    pass  # magic to process HTML into legible snippet
 
-    # For some reason, the API gives the page *number* as the key, so we
-    # just grab the first page number in the results.
-    snippet = snippet[list(snippet.keys())[0]]
-
-    return snippet['extract']
+    return snippet
 
 
 @rule('.*/([a-z]+\.wikipedia.org)/wiki/([^ ]+).*')
@@ -129,7 +115,7 @@ def mw_info(bot, trigger, found_match=None):
 def wikipedia(bot, trigger):
     lang = bot.config.wikipedia.default_lang
 
-    #change lang if channel has custom language set
+    # change lang if channel has custom language set
     if (trigger.sender and not trigger.sender.is_nick() and
             bot.config.wikipedia.lang_per_channel):
         customlang = re.search('(' + trigger.sender + '):(\w+)',
