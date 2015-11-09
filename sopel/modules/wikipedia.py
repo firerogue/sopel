@@ -15,9 +15,9 @@ import re
 
 import sys
 if sys.version_info.major < 3:
-    from urlparse import unquote
+    from urlparse import unquote, urlparse
 else:
-    from urllib.parse import unquote
+    from urllib.parse import unquote, urlparse
 
 REDIRECT = re.compile(r'^REDIRECT (.*)')
 
@@ -77,6 +77,29 @@ def mw_snippet(server, query):
     Retrives a snippet of the specified length from the given page on the given
     server.
     """
+    request = urlparse(query)
+    # check for fragment
+    if request.fragment is not '':
+        # check for section with given name
+        tos_url = ('https://' + server + '/w/api.php?format=json&action=parse'
+                   '&prop=sections&page=' + request.path)
+        tos = json.loads(web.get(tos_url))
+        # list. There's got to be a better way to do this
+        index = None
+        for section in tos['parse']['sections']:
+            if section['anchor'] == request.fragment:
+                index = section['index']
+                break
+        if index:
+            snippet_url = ('https://' + server + '/w/api.php?format=xml'
+                           '&action=parse&prop=text&page=' + request.path +
+                           '&section=' + index)
+            snippet = web.get(snippet_url)
+            pass  # magic to process HTML into legible snippet_raw
+
+            return snippet
+
+    # Fall back on old behaviour
     snippet_url = ('https://' + server + '/w/api.php?format=json'
                    '&action=query&prop=extracts&exintro&explaintext'
                    '&exchars=300&redirects&titles=')
@@ -84,8 +107,8 @@ def mw_snippet(server, query):
     snippet = json.loads(web.get(snippet_url))
     snippet = snippet['query']['pages']
 
-    # For some reason, the API gives the page *number* as the key, so we just
-    # grab the first page number in the results.
+    # For some reason, the API gives the page *number* as the key, so we
+    # just grab the first page number in the results.
     snippet = snippet[list(snippet.keys())[0]]
 
     return snippet['extract']
